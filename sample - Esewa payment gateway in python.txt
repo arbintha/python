@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eSewa Payment</title>
+</head>
+<body>
+    <h1>eSewa Payment</h1>
+    <form action="/pay" method="post">
+        <label for="amount">Amount:</label>
+        <input type="text" id="amount" name="amount"><br><br>
+        <label for="product_id">Product ID:</label>
+        <input type="text" id="product_id" name="product_id"><br><br>
+        <label for="ref_id">Reference ID:</label>
+        <input type="text" id="ref_id" name="ref_id"><br><br>
+        <input type="submit" value="Pay with eSewa">
+    </form>
+</body>
+</html>
+
+
+
+#pip install requests
+
+import requests
+from flask import Flask, request, render_template
+
+app = Flask(__name__)
+
+MERCHANT_CODE = 'YOUR_MERCHANT_CODE'
+RETURN_URL = 'YOUR_RETURN_URL'
+
+@app.route('/pay', methods=['POST'])
+def pay():
+    amount = request.form['amount']
+    product_id = request.form['product_id']
+    ref_id = request.form['ref_id']
+
+    payload = {
+        'amt': amount,
+        'pdc': 0,
+        'psc': 0,
+        'txAmt': 0,
+        'tAmt': amount,
+        'pid': product_id,
+        'scd': MERCHANT_CODE,
+        'su': RETURN_URL + '?q=su',
+        'fu': RETURN_URL + '?q=fu'
+    }
+
+    response = requests.post('https://uat.esewa.com.np/epay/main', data=payload)
+
+    if response.status_code == 200:
+        return render_template('payment_redirect.html', response=response.text)
+    else:
+        return 'Payment initiation failed', 400
+
+@app.route('/payment-confirmation')
+def payment_confirmation():
+    ref_id = request.args.get('refId')
+    amount = request.args.get('amt')
+    product_id = request.args.get('oid')
+
+    verification_payload = {
+        'amt': amount,
+        'rid': ref_id,
+        'pid': product_id,
+        'scd': MERCHANT_CODE
+    }
+
+    verification_response = requests.post('https://uat.esewa.com.np/epay/transrec', data=verification_payload)
+
+    if 'Success' in verification_response.text:
+        return 'Payment successful'
+    else:
+        return 'Payment verification failed', 400
+
+if __name__ == '__main__':
+    app.run(debug=True)
