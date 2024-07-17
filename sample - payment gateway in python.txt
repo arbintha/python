@@ -1,0 +1,59 @@
+#pip install cx_Oracle stripe
+ 
+
+import stripe
+import cx_Oracle
+
+# Stripe API keys (replace with your actual keys)
+stripe.api_key = "sk_test_your_secret_key"
+
+# Oracle database connection details
+dsn_tns = cx_Oracle.makedsn('hostname', 'port', service_name='service_name')
+connection = cx_Oracle.connect(user='your_username', password='your_password', dsn=dsn_tns)
+
+def make_payment(amount, currency, card_number, exp_month, exp_year, cvc, description):
+    try:
+        # Create a token using Stripe
+        token_response = stripe.Token.create(
+            card={
+                "number": card_number,
+                "exp_month": exp_month,
+                "exp_year": exp_year,
+                "cvc": cvc,
+            },
+        )
+
+        # Create a charge using the token
+        charge = stripe.Charge.create(
+            amount=int(amount * 100),  # Amount in cents
+            currency=currency,
+            source=token_response.id,
+            description=description
+        )
+        
+        # Store payment details in Oracle database
+        cursor = connection.cursor()
+        cursor.execute("""
+            INSERT INTO payments (charge_id, amount, currency, description, status)
+            VALUES (:charge_id, :amount, :currency, :description, :status)
+        """, charge_id=charge.id, amount=amount, currency=currency, description=description, status=charge.status)
+        connection.commit()
+        
+        return charge
+    except stripe.error.StripeError as e:
+        # Handle Stripe errors
+        print(f"Stripe error: {e.user_message}")
+        return None
+    except cx_Oracle.DatabaseError as e:
+        # Handle Oracle database errors
+        print(f"Database error: {e}")
+        return None
+
+# Example usage
+charge = make_payment(
+    50.0, 'usd', '4242424242424242', 12, 2024, '123', 'Purchase of online store items'
+)
+if charge:
+    print(f"Payment successful: {charge.id}")
+else:
+    print("Payment failed.")
