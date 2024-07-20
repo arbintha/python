@@ -1,0 +1,125 @@
+#go get github.com/godror/godror
+
+##############################
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/godror/godror"
+)
+
+func main() {
+    dsn := "user/password@hostname:port/service_name"
+    db, err := sql.Open("godror", dsn)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    ctx := context.Background()
+    err = db.PingContext(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("Connected to Oracle Database!")
+}
+
+#############################
+SELECT 
+    (SUM(dropped_calls) / SUM(total_calls)) * 100 AS call_drop_rate
+FROM
+    call_data
+
+WHERE
+    date BETWEEN :startDate AND :endDate;
+
+
+##############################
+
+package main
+
+import (
+    "context"
+    "database/sql"
+    "fmt"
+    "log"
+    "time"
+
+    _ "github.com/godror/godror"
+)
+
+func main() {
+    dsn := "user/password@hostname:port/service_name"
+    db, err := sql.Open("godror", dsn)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    ctx := context.Background()
+    startDate := "2023-01-01"
+    endDate := "2023-01-31"
+    query := `
+        SELECT 
+            (SUM(dropped_calls) / SUM(total_calls)) * 100 AS call_drop_rate
+        FROM
+            call_data
+        WHERE
+            date BETWEEN :1 AND :2`
+
+    rows, err := db.QueryContext(ctx, query, startDate, endDate)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rows.Close()
+
+    var callDropRate float64
+    for rows.Next() {
+        if err := rows.Scan(&callDropRate); err != nil {
+            log.Fatal(err)
+        }
+    }
+
+    if err := rows.Err(); err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Call Drop Rate: %.2f%%\n", callDropRate)
+}
+
+###############################
+package main
+
+import (
+    "time"
+)
+
+func main() {
+    ticker := time.NewTicker(24 * time.Hour)
+    quit := make(chan struct{})
+
+    go func() {
+        for {
+            select {
+            case <-ticker.C:
+                generateReports()
+            case <-quit:
+                ticker.Stop()
+                return
+            }
+        }
+    }()
+
+    // Simulating the running application
+    time.Sleep(72 * time.Hour)
+    close(quit)
+}
+
+func generateReports() {
+    // Place the logic to generate and send reports here
+    fmt.Println("Generating reports...")
+}
