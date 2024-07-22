@@ -1,0 +1,113 @@
+#### fLASK API in Python to draw a bar chart from php application
+
+/**
+Install Flask and Flask-RESTful: pip install Flask Flask-RESTful
+Save the code as chart_api.py.
+Run the script: python chart_api.py. This will start the API - port 5000.
+
+*/
+
+
+
+#pip install Flask Flask-RESTful
+
+from flask import Flask, jsonify, send_file
+from flask_restful import Api, Resource
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+
+app = Flask(__name__)
+api = Api(app)
+
+class ChartData(Resource):
+  def get(self):
+    # Replace 'your_file.xlsx' with your actual file path
+    filename = 'your_file.xlsx'
+
+    try:
+      # Read data from Excel
+      data = pd.read_excel(filename)
+
+      # Assuming data has columns named 'Province', 'Population', and 'Sites'
+      provinces = data['Province'].tolist()
+      population = data['Population'].tolist()
+      sites = data['Sites'].tolist()
+
+      # Create a stacked bar chart
+      plt.figure(figsize=(8, 6))
+
+      # Create the bars
+      bar_width = 0.35
+      index = range(len(provinces))
+      plt.bar(index, population, bar_width, label='Population')
+      plt.bar([p + bar_width for p in index], sites, bar_width, label='Sites')
+
+      # Set labels and title
+      plt.xlabel('Province')
+      plt.ylabel('Value')
+      plt.title('Population and Sites by Province')
+
+      # Set x-axis tick positions and labels
+      plt.xticks([p + bar_width/2 for p in index], provinces)
+
+      # Add legend
+      plt.legend()
+
+      # Create an image buffer
+      img_io = io.BytesIO()
+      plt.savefig(img_io, format='png')
+      img_io.seek(0)
+
+      # Clear the plot for future requests (optional)
+      plt.clf()
+
+      # Return chart image as a response
+      return send_file(img_io, mimetype='image/png')
+
+    except Exception as e:
+      # Handle errors gracefully (e.g., file not found, invalid data)
+      return jsonify({'error': str(e)}), 500
+
+api.add_resource(ChartData, '/chart_data')
+
+if __name__ == '__main__':
+  app.run(debug=True)
+
+######################################
+  
+
+/*how to call the API from a PHP script:*/
+
+<?php
+
+$url = 'http://localhost:5000/chart_data'; // Replace with your actual API URL
+
+// Use cURL to make a GET request
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+// Get the response
+$response = curl_exec($ch);
+
+// Check for errors
+if (curl_errno($ch)) {
+  echo 'Error: ' . curl_error($ch);
+} else {
+  // Decode the response (assuming it's JSON)
+  $data = json_decode($response, true);
+
+  if (isset($data['error'])) {
+    echo 'API error: ' . $data['error'];
+  } else {
+    // The response should contain the image data (base64 encoded)
+    $image_data = base64_encode($data);
+
+    // Display the image using HTML
+    echo '<img src="data:image/png;base64,' . $image_data . '" alt="Chart">';
+  }
+}
+
+curl_close($ch);
+
+?>
